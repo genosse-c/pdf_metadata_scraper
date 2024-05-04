@@ -2,10 +2,8 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>JSGloss testing page</title>
+    <title>PDF Scraper testing page</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
-    <link rel="stylesheet" href="jsgloss.css">
-    <script type="text/javascript" src="buffer.js" ></script>
     <script type="text/javascript" src="PDFScraper.js" ></script>
     <script>
       function handleFileSelect() {
@@ -22,13 +20,17 @@
       }
 
       function scrapeMetadata(contents){
-        document.getElementById("results").textContent= PDFScraper.pretty_print(contents);
+        var scraper = new PDFScraper(contents);
+        document.getElementById("results").innerHTML= scraper.pretty_print_unique_values(true);
       }
     </script>
   </head>
   <body style="margin: 2em">
 	  <form>
-	    <input type="file" id="file-input" onchange="handleFileSelect()">
+	    <label>Select a PDF
+	      <input type="file" id="file-input" onchange="handleFileSelect()">
+	    </label>
+	    <p>Uploaded PDFs will be scraped for metadata.<br/> Results will be displayed below.</p>
 	  </form>
 	  <div id="results" style="white-space: pre"></div>
   </body>
