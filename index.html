@@ -11,9 +11,7 @@
         const file = input.files[0];
         const reader = new FileReader();
         reader.onload = function() {
-          console.log("onload");
           const contents = reader.result;
-          // Process the contents of the file
           scrapeMetadata(contents);
         };
         reader.readAsText(file);
@@ -21,7 +19,7 @@
 
       function scrapeMetadata(contents){
         var scraper = new PDFScraper(contents);
-        document.getElementById("results").innerHTML= scraper.pretty_print_unique_values(true);
+        document.getElementById("results").innerHTML= scraper.pretty_print_unique_values('HTML');
       }
     </script>
   </head>

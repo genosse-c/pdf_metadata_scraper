@@ -12,7 +12,7 @@
 
 class PDFScraper {
   /**
-  * Constructor for JSGloss
+  * Constructor for PDFScraper
   *
   * @param  binary variable holding the binary representation of the PDF to be scrapped
   * @return      instantiated JSGloss object
@@ -46,28 +46,34 @@ class PDFScraper {
   }
 
   /**
-  * Outputs found metadata but reduced to those with unique values either as JSON or as HTML
+  * Outputs found metadata but reduced to those with unique values either as JS, JSON or as HTML
   *
-  * @markup   if present will force HTML markup as return value
+  * @format   switch to select the type of output. Currently supports JS, JSON string, HTML
   * @return {string} json or HTML represenation of metadata items from the PDF
   */
-  pretty_print_unique_values(markup){
+  pretty_print_unique_values(format){
     let data = [this.info_objects, this.metadata_objects()]
     this.unique = {};
     this.walk_data(data);
-    if (!markup){
-      return JSON.stringify(this.unique, null, '  ');
-    }
 
-    var keyArray = Object.keys(this.unique);
-    keyArray.sort((a, b) => a.length - b.length);
-    let html = '<dl class="pdf-scraper">';
-    keyArray.forEach(function(key){
-      html += `<dt>${key}</dt><dd>${this.unique[key]}</dd>`
-    }, this)
-    html += '</dl>';
-    return html;
+    switch (format) {
+      case 'JSON':
+        return JSON.stringify(this.unique, null, '  ');
+      case 'JS':
+        let um = this.unique;
+        return um;
+      case 'HTML':
+        var keyArray = Object.keys(this.unique);
+        keyArray.sort((a, b) => a.length - b.length);
+        let html = '<dl class="pdf-scraper">';
+        keyArray.forEach(function(key){
+          html += `<dt>${key}</dt><dd>${this.unique[key]}</dd>`
+        }, this)
+        html += '</dl>';
+        return html;
+    }
   }
+
   /**
   * Helper function to reduce found metadata to unique metadata values
   *
@@ -99,17 +105,13 @@ class PDFScraper {
   * @return {object} Object holding the metadata
   */
   info_objects() {
-    const refs = this.info_refs();
+    const rawInfodataObjects = this.raw_info_objects();
     const objects = {};
 
-    if (refs){
-      for (const ref of refs) {
-        const objId = ref.slice(6, -2);
-        const obj = this.get_object(objId);
-        if (obj){
-          const list = obj.flat().filter((item, index, self) => self.indexOf(item) === index);
-          objects[ref] = list.map(rawInfoObj => this.parse_info_object(rawInfoObj));
-        }
+    for (const rawInfodata of rawInfodataObjects) {
+      const map = this.parse_info_object(rawInfoObj);
+      if (map && Object.keys(map).length > 0) {
+        objects.push(map);
       }
     }
 
@@ -128,7 +130,6 @@ class PDFScraper {
   metadata_objects() {
     const rawMetadataObjects = this.raw_metadata_objects()
     const objects = [];
-    console.log(rawMetadataObjects);
     for (const rawMetadata of rawMetadataObjects) {
       const map = this.parse_metadata_object(rawMetadata);
       if (map && Object.keys(map).length > 0) {
@@ -220,7 +221,7 @@ class PDFScraper {
     }
   }
   /**
-  * Determines wether the PDF version
+  * Determines whether the PDF version is encrypted
   * @return {Boolean} Is PDF encrypted?
   */
   is_encrypted() {
@@ -357,7 +358,6 @@ class PDFScraper {
   *****************/
 
   decode_value(value, hex = false) {
-    console.log("value to decode: "+value);
     if (value.startsWith("feff")) {
       let base16EncodedUtf16BigEndian = value.slice(4).replace(/[^0-9a-f]/gi, "");
       try {
@@ -453,36 +453,32 @@ class PDFScraper {
 }
 
 class BufferWrangler {
-
-  hexToDecimalLookupTable = {
-	  0: 0,
-	  1: 1,
-	  2: 2,
-	  3: 3,
-	  4: 4,
-	  5: 5,
-	  6: 6,
-	  7: 7,
-	  8: 8,
-	  9: 9,
-	  a: 10,
-	  b: 11,
-	  c: 12,
-	  d: 13,
-	  e: 14,
-	  f: 15,
-	  A: 10,
-	  B: 11,
-	  C: 12,
-	  D: 13,
-	  E: 14,
-	  F: 15,
-  };
-
+  /**
+  * Constructor for BufferWrangler
+  *
+  * @param  buffer variable holding the binary data
+  * @enc {string}  optional argument to set a target encoding for the binary data
+  *                currently supports 'HEX' and 'utf16', with the default being 'utf8'
+  * @return      instantiated BufferWrangler object
+  */
   constructor(buffer, enc){
     this.setBuffer(buffer, enc);
   }
 
+  /*
+  * Simple table required for HEX conversions
+  */
+  hexToDecimalLookupTable = {
+	  0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, a: 10, b: 11, c: 12, d: 13, e: 14, f: 15, A: 10, B: 11, C: 12, D: 13, E: 14,F: 15,
+  };
+
+  /**
+  * Allows to set the internal Buffer, optionally setting a target encoding for the buffer
+  *
+  * @param  buffer variable holding the binary data
+  * @enc {string}  optional argument to set a target encoding for the binary data
+  *                currently supports 'HEX' and 'utf16', with the default being 'utf8'
+  */
   setBuffer(buffer, enc){
     switch(enc){
       case "hex":
@@ -523,6 +519,15 @@ class BufferWrangler {
     }
   }
 
+  /**
+  * Basically a class function, since it does not touch the internal buffer, but rather accepts a number of TypedArrays and
+  * concats them
+  *
+  * @param  arrays [Array] variable the Uint8Array to be concattenated
+  * @totalLength {integer} sets the max length of the returned Uint8Array
+  *
+  * @return {Uint8Array} Uint8Array array
+  */
   concat(arrays, totalLength) {
 	  if (arrays.length === 0) {
 		  return new Uint8Array(0);
@@ -541,10 +546,20 @@ class BufferWrangler {
 	  return returnValue;
   }
 
+  /*
+  * @return {TypedArray} returns the internal buffer
+  */
   getBuffer(){
     return this.buffer;
   }
 
+  /**
+  * Outputs the internal buffer as string, optionally re-encoding the buffer
+  *
+  * @param  enc determines the target encoding, currently only supports 'utf16le' and 'utf8' (default)
+  * @enc {string}  optional argument to set a target encoding for the binary data
+  *                currently supports 'HEX' and 'utf16', with the default being 'utf8'
+  */
   toString(enc){
     const decoder = new TextDecoder();
 
